@@ -7,13 +7,8 @@
   rowReader.setAttribute("aria-hidden", "true");
   document.body.append(rowReader);
   rowReader.hidden = true;
-  const panel = document.createElement("div");
-  panel.className = "poem-sound";
-  panel.innerHTML = `<button type="button" aria-pressed="true" aria-label="静音" title="声音默认开启，点击静音">
-    <img class="sound-muted" src="sound-muted.jpg" alt="" width="1019" height="788" draggable="false">
-    <img class="sound-playing" src="sound-playing.jpg" alt="" width="977" height="755" draggable="false">
-  </button>`;
-  document.body.append(panel);
+  const panel = document.querySelector(".poem-sound");
+  if (!panel) return;
   // 按用户截图中的滑块位置估算；保留在代码中，页面只显示声音开关。
   const defaults = Object.freeze({
     tempo: 42,
@@ -29,8 +24,8 @@
   });
   const value = name => defaults[name];
   const button = panel.querySelector("button");
-  // 声音开关默认开启；浏览器音频授权状态独立处理。
-  let muted = false;
+  // 进入页面默认静音、闭嘴，点击嘴唇后才开启声音。
+  let muted = true;
   let audio, master, mix, drumBus, stringBus, melodyBus, bellBus, liveGate, duck, cutoff, saturator, space, noise, wave;
   let playing = false, nextTime = 0, stepNumber = 0, barScore, previousDegree = 2;
   let barDuration = 240 / 42, stepDuration = barDuration / 16;
@@ -453,7 +448,7 @@
   document.addEventListener("pointerdown", unlockSound, true);
   document.addEventListener("click", unlockSound, true);
   document.addEventListener("keydown", unlockSound, true);
-  function followScanIntersection() {
+  function updateScanVisuals() {
     // 音频未解锁或暂停时，用独立画面时钟推进横、竖两条线。
     // 音频开始输出后由 drawTransport 接管，不会把横条锁在第一行。
     const timestamp = performance.now();
@@ -477,21 +472,20 @@
         }
       }
     }
-    const vertical = reader.getBoundingClientRect();
-    const scanStyle = getComputedStyle(reader, "::before");
-    const offset = scanStyle.transform === "none" ? 0 : new DOMMatrixReadOnly(scanStyle.transform).m41;
-    const barWidth = parseFloat(scanStyle.width) || 18;
-    const horizontal = rowReader.getBoundingClientRect();
-    // 固定定位使用视口坐标；滚动页面时中心仍准确落在两条线交叉处。
-    panel.style.left = `${vertical.left + offset + barWidth / 2}px`;
-    panel.style.top = `${horizontal.top + horizontal.height / 2}px`;
-    requestAnimationFrame(followScanIntersection);
+    // 保持标题处的纵向位置，整组左边缘对齐纵向绿条的固定起点。
+    const heading = document.querySelector(".poem-title");
+    if (heading) {
+      const titleRect = heading.getBoundingClientRect();
+      const readerRect = reader.getBoundingClientRect();
+      panel.style.left = `${readerRect.left + window.scrollX}px`;
+      panel.style.top = `${titleRect.top + window.scrollY + titleRect.height / 2}px`;
+    }
+    requestAnimationFrame(updateScanVisuals);
   }
   updateSoundButton();
-  requestPlayback();
   document.fonts.ready.then(() => {
     if (!muted) requestPlayback();
-    requestAnimationFrame(followScanIntersection);
+    requestAnimationFrame(updateScanVisuals);
   });
   document.addEventListener("visibilitychange", async () => {
     if (!audio || !playing) return;

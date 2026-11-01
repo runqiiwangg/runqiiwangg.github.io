@@ -6,12 +6,25 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>My Poem</title>
-  <link rel="stylesheet" href="style.css?v=20261102-audio-blend-2">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:wght@400&amp;display=swap">
+  <link rel="stylesheet" href="style.css?v=20261102-reader-aligned-multiply">
 </head>
 <body>
 
-  <h1> 呢喃</h1>
-  <p>—— “No Place for Self-Pity, No Room for Fear.”
+  <h1><span class="poem-title"> 呢喃</span></h1>
+  <div class="poem-sound" data-audio-state="muted">
+    <button type="button" aria-pressed="false" aria-label="播放声音" title="播放声音" aria-describedby="poem-sound-label">
+      <img class="sound-muted" src="sound-muted.jpg" alt="" width="1019" height="788" draggable="false">
+      <img class="sound-playing" src="sound-playing.jpg" alt="" width="977" height="755" draggable="false">
+    </button>
+    <span class="poem-sound-label" id="poem-sound-label">
+      <span class="sound-label-muted">Open Mouth To Murmur</span>
+      <span class="sound-label-playing">Shut Up</span>
+    </span>
+  </div>
+  <p><span class="poem-quote">—— “No Place for Self-Pity, No Room for Fear.”</span>
     下个月，
         大风和冷气将要冰封整片大陆，
         不留一丝安全的记忆。
@@ -40,13 +53,13 @@
   <span class="emphasis">我们要说出，
   说出至少一句真正的话。</span>
 </p>
-  <script src="script.js" defer></script>
+  <script src="script.js?v=20261102-modern-font" defer></script>
   <script src="grass.js" defer></script>
   <script src="score.js" defer></script>
   <script src="visual-input.js" defer></script>
   <script src="strings.js" defer></script>
   <script src="interaction.js" defer></script>
-  <script src="sound.js?v=20261102-audio-blend-2" defer></script>
+  <script src="sound.js?v=20261102-reader-aligned-multiply" defer></script>
 </body>
 
 </html>

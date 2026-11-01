@@ -20,12 +20,12 @@
       fragment.append(line);
     };
     nextLine();
-    const visit = (node, emphasis = false) => {
+    const visit = (node, emphasis = false, quote = false) => {
       if (node.nodeType === Node.TEXT_NODE) {
         for (const character of Array.from(node.textContent)) {
           if (character === "\n") { nextLine(); continue; }
           const span = document.createElement("span");
-          span.className = "poem-character" + (emphasis ? " emphasis" : "");
+          span.className = "poem-character" + (emphasis ? " emphasis" : "") + (quote ? " poem-quote" : "");
           span.textContent = character;
           line.append(span);
           // 保留缩进和内部空格，但每轮只移动一个可见字（含标点）。
@@ -33,7 +33,8 @@
         }
       } else {
         for (const child of node.childNodes) {
-          visit(child, emphasis || node.classList?.contains("emphasis"));
+          visit(child, emphasis || node.classList?.contains("emphasis"),
+            quote || node.classList?.contains("poem-quote"));
         }
       }
     };
@@ -125,6 +126,8 @@
     }
     const margin = parseFloat(getComputedStyle(document.body).marginRight) || 24;
     const destinationLeft = Math.max(left, document.documentElement.clientWidth - margin - poemWidth);
+    // 将定型文字的左对齐基准共享给标题旁的声音开关。
+    reader.style.setProperty("--poem-destination-left", `${destinationLeft + window.scrollX}px`);
     const shift = destinationLeft - left;
 
     // 使用实际字体测量 tab，避免中英文字体宽度不同造成速度变化。

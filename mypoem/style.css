@@ -114,25 +114,57 @@ p {
 
 /* 底层顺序：阅读竖条 → 草地 → 原诗 → 文字副本。 */
 /* 保持 body 与 html 背景处于同一混合上下文，让嘴唇叠到底图上。 */
-.grass-field { z-index: 1; }
-body > p, body > h1 { z-index: 2; }
+.grass-field { position: absolute; pointer-events: none; z-index: 1; }
+body > p, body > h1 { position: relative; z-index: 2; }
 .poem-copies { z-index: 3; }
 .poem-sound {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
-  transform: translate(-50%, -50%);
+  width: max-content;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
   z-index: 10;
   background: transparent;
   mix-blend-mode: multiply;
   isolation: auto;
 }
-/* 整个嘴唇按钮作为一个图层，与下方页面正片叠底。 */
+/* 在外层统一正片叠底，让嘴唇穿过内部旋转图层与页面底图混合。 */
 .poem-sound button, .poem-sound img { mix-blend-mode: normal; }
+/* 声音提示与英文引句共用 Bodoni Moda 衬线字体。 */
+.poem-sound-label, .poem-quote {
+  font-family: "Bodoni Moda", Georgia, serif;
+  font-optical-sizing: auto;
+  font-style: normal;
+}
+.poem-sound-label {
+  padding: 3px 6px;
+  background-color: #b1dd59f9;
+  color: #000;
+  font-size: 20px;
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1.4;
+  white-space: nowrap;
+  display: inline-block;
+  transform-origin: center;
+  animation: murmur-label-sway 2.5s linear infinite alternate;
+}
+/* 参考长方形的往返旋转：绿底与文字作为一个整体运动。 */
+@keyframes murmur-label-sway {
+  from { transform: translateY(0) rotate(-10deg); }
+  to { transform: translateY(2px) rotate(10deg); }
+}
+
+.sound-label-playing { display: none; }
+.poem-sound button[aria-pressed="true"] + .poem-sound-label .sound-label-muted { display: none; }
+.poem-sound button[aria-pressed="true"] + .poem-sound-label .sound-label-playing { display: inline; }
 .poem-sound button {
   display: block;
   position: relative;
-  width: min(392px, calc(100vw - 32px));
+  width: min(120px, calc(100vw - 32px));
   aspect-ratio: 1.294 / 1;
   padding: 0;
   border: 0;
@@ -140,6 +172,17 @@ body > p, body > h1 { z-index: 2; }
   background: transparent;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transform-origin: center;
+  animation: murmur-mouth-sway 11.6s ease-in-out infinite;
+}
+/* 独立于提示字的节拍：左右交替，大小摆幅与每次转向的时长不同。 */
+@keyframes murmur-mouth-sway {
+  0%, 100% { transform: rotate(-8deg); }
+  17% { transform: rotate(20deg); }
+  34% { transform: rotate(-5deg); }
+  49% { transform: rotate(12deg); }
+  72% { transform: rotate(-22deg); }
+  88% { transform: rotate(6deg); }
 }
 /* 去色、淡暖纸色与稍强对比，保留铅笔颗粒，模拟旧扫描稿。 */
 .poem-sound img {
@@ -152,9 +195,27 @@ body > p, body > h1 { z-index: 2; }
   pointer-events: none;
   user-select: none;
 }
+/* 关闭时闭嘴并摆动；开启时停止旋转，改为两张嘴唇交替出现。 */
 .poem-sound .sound-playing { visibility: hidden; }
-.poem-sound button[aria-pressed="true"] .sound-playing { visibility: visible; }
-.poem-sound button[aria-pressed="true"] .sound-muted { visibility: hidden; }
+.poem-sound button[aria-pressed="true"],
+.poem-sound button[aria-pressed="true"] + .poem-sound-label {
+  animation: none;
+  transform: none;
+}
+.poem-sound button[aria-pressed="true"] .sound-playing {
+  animation: murmur-mouth-open .7s steps(1, end) infinite;
+}
+.poem-sound button[aria-pressed="true"] .sound-muted {
+  animation: murmur-mouth-closed .7s steps(1, end) infinite;
+}
+@keyframes murmur-mouth-open {
+  0%, 100% { visibility: visible; }
+  50% { visibility: hidden; }
+}
+@keyframes murmur-mouth-closed {
+  0%, 100% { visibility: hidden; }
+  50% { visibility: visible; }
+}
 .poem-sound button:focus-visible { outline: 2px solid #323a20; outline-offset: 4px; }
 .poem-sound button:disabled { cursor: wait; }
 
@@ -169,3 +230,9 @@ body > p, body > h1 { z-index: 2; }
   z-index: 0;
 }
 .poem-row-reader[hidden] { display: none; }
+
+@media (max-width: 520px) {
+  .poem-sound { gap: 6px; }
+  .poem-sound button { width: 72px; }
+  .poem-sound-label { font-size: 14px; padding: 3px 4px; }
+}

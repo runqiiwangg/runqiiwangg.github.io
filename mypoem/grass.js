@@ -116,7 +116,13 @@
     width = Math.max(1, viewportWidth * .87 - left);
     height = Math.min(lineHeight * 13, Math.max(100, rect.bottom + window.scrollY - 20));
     canvas.style.left = `${left + window.scrollX - padding}px`;
-    canvas.style.top = `${rect.bottom + window.scrollY + lineHeight * .9 - height - padding}px`;
+    // 保留原草丛宽高，只把定位基准上移到“趁风还踌躇着”这一行。
+    const upperAnchor = [...document.querySelectorAll(".poem-line")]
+      .find(line => line.textContent.includes("趁风还踌躇着"));
+    const upperRect = upperAnchor?.getBoundingClientRect() || rect;
+    // 向下平移六行（约一个半诗节），草丛的生成范围保持不变。
+    const downwardOffset = lineHeight * 6;
+    canvas.style.top = `${upperRect.bottom + window.scrollY + lineHeight * .9 - height - padding + downwardOffset}px`;
     canvas.style.width = `${width + padding * 2}px`;
     canvas.style.height = `${height + padding * 2}px`;
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
