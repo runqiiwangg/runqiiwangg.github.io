@@ -10,7 +10,7 @@
   const canvas = document.createElement("canvas");
   canvas.className = "grass-field";
   canvas.setAttribute("aria-hidden", "true");
-  document.body.append(canvas);
+  document.querySelector(".poem-effects").append(canvas);
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   let width = 0;

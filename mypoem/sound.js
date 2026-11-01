@@ -5,7 +5,7 @@
   const rowReader = document.createElement("div");
   rowReader.className = "poem-row-reader";
   rowReader.setAttribute("aria-hidden", "true");
-  document.body.append(rowReader);
+  document.querySelector(".poem-effects").append(rowReader);
   rowReader.hidden = true;
   const panel = document.querySelector(".poem-sound");
   if (!panel) return;

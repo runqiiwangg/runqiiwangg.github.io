@@ -1,5 +1,6 @@
 /* 整张背景随整页的宽、高拉伸，包含页面四周和滚动区域。 */
 html {
+  position: relative;
   min-height: 100vh;
   background-color: #fffef2;
   background-image: url("background.jpg");
@@ -60,6 +61,14 @@ p {
 .poem-character {
   display: inline-block;
   white-space: pre;
+}
+
+/* 装饰图层不参与页面高度，超出背景边界的部分不产生额外滚动区域。 */
+.poem-effects {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  pointer-events: none;
 }
 
 .poem-copies {

@@ -49,14 +49,15 @@
     });
   });
 
+  const effects = document.querySelector(".poem-effects");
   const layer = document.createElement("div");
   layer.className = "poem-copies";
   layer.setAttribute("aria-hidden", "true");
-  document.body.append(layer);
+  effects.append(layer);
   const reader = document.createElement("div");
   reader.className = "poem-reader";
   reader.setAttribute("aria-hidden", "true");
-  document.body.append(reader);
+  effects.append(reader);
   let timer;
   let animations = [];
   let trailFrame;
