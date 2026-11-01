@@ -14,7 +14,7 @@ h1 {
   font-weight: normal;
   color: rgb(50, 58, 32);
 
-  animation: move 4s ease-out forwards;
+
 }
 
 p {
@@ -35,3 +35,40 @@ p {
 
 
 
+
+/* 原诗保持在文档中；移动副本单独绘制，不改变原有排版。 */
+:root {
+  --round-interval: 500ms;
+  --tab-size: 4;
+}
+
+.poem-line {
+  display: block;
+  min-height: 2em;
+  white-space: pre;
+}
+
+.poem-character {
+  display: inline-block;
+  white-space: pre;
+}
+
+.poem-copies {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  overflow: clip;
+}
+
+.poem-copy {
+  position: absolute;
+  white-space: pre;
+  margin: 0;
+  will-change: transform;
+}
+
+@media (max-width: 700px) {
+  body { margin: 24px; }
+}
