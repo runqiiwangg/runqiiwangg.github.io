@@ -1,9 +1,9 @@
 (() => {
   "use strict";
 
-  // 每半秒开始一轮；tab 按四个空格计算。飞行的平均速度为每半秒一个 tab。
+  // 每四分之一秒开始一轮；tab 按四个空格计算。飞行的平均速度为每四分之一秒一个 tab。
   const rootStyle = getComputedStyle(document.documentElement);
-  const roundInterval = parseFloat(rootStyle.getPropertyValue("--round-interval")) || 500;
+  const roundInterval = parseFloat(rootStyle.getPropertyValue("--round-interval")) || 250;
   const tabSize = parseFloat(rootStyle.getPropertyValue("--tab-size")) || 4;
   const paragraphs = [...document.querySelectorAll("body > p")];
   const lines = [];
@@ -41,15 +41,35 @@
     paragraph.replaceChildren(fragment);
   }
 
+  lines.forEach((item, index) => {
+    item.element.dataset.poemLine = String(index);
+    item.characters.forEach((character, glyphIndex) => {
+      character.dataset.poemGlyph = `${index}:${glyphIndex}`;
+    });
+  });
+
   const layer = document.createElement("div");
   layer.className = "poem-copies";
   layer.setAttribute("aria-hidden", "true");
   document.body.append(layer);
+  const reader = document.createElement("div");
+  reader.className = "poem-reader";
+  reader.setAttribute("aria-hidden", "true");
+  document.body.append(reader);
   let timer;
   let animations = [];
+  let trailFrame;
+  const trailInterval = 1000;
+
+  // 固定的伪随机值：刷新或调整窗口后，碎片构图仍保持一致。
+  function scatter(seed) {
+    const value = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+    return value - Math.floor(value);
+  }
 
   function start() {
     clearTimeout(timer);
+    cancelAnimationFrame(trailFrame);
     animations.forEach(animation => animation.cancel());
     animations = [];
     layer.replaceChildren();
@@ -62,6 +82,47 @@
     const left = Math.min(...bounds.map(rect => rect.left));
     const right = Math.max(...activeLines.map(item => item.characters.at(-1).getBoundingClientRect().right));
     const poemWidth = right - left;
+    const originalRight = right + window.scrollX;
+    // JS 只提供排版位置；竖条的外观、匀速运动和循环全部由 CSS 控制。
+    const chineseCharacter = activeLines.flatMap(item => item.characters)
+      .find(character => /[\u3400-\u9fff]/u.test(character.textContent));
+    const readerWidth = chineseCharacter?.getBoundingClientRect().width || 18;
+    const pageRight = document.documentElement.clientWidth + window.scrollX;
+    const readerStart = Math.min(originalRight, Math.max(0, pageRight - readerWidth));
+    reader.style.setProperty("--reader-start", `${readerStart}px`);
+    reader.style.setProperty("--reader-width", `${readerWidth}px`);
+    reader.style.setProperty("--reader-travel", `${Math.max(0, pageRight - readerWidth - readerStart)}px`);
+    const updateReaderHeight = () => {
+      reader.style.height = `${Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)}px`;
+    };
+    requestAnimationFrame(updateReaderHeight);
+    const movingCopies = [];
+
+    // 每个字越过整首原诗的右边界后，独立计时；静止副本永久留在图层中。
+    function leaveTrails(now) {
+      for (let index = movingCopies.length - 1; index >= 0; index -= 1) {
+        const item = movingCopies[index];
+        if (item.animation.playState === "finished" || item.animation.playState === "idle") {
+          movingCopies.splice(index, 1);
+          continue;
+        }
+        const position = item.copy.getBoundingClientRect();
+        if (position.left + window.scrollX <= originalRight) continue;
+        if (item.nextTrail === null) item.nextTrail = now + trailInterval;
+        if (now < item.nextTrail) continue;
+
+        const trail = item.copy.cloneNode(true);
+        trail.classList.add("poem-trail");
+        // cloneNode 不复制 Web Animation，保存当前变换即可冻结当时的位置。
+        trail.style.transform = getComputedStyle(item.copy).transform;
+        trail.style.willChange = "auto";
+        layer.append(trail);
+        item.nextTrail = now + trailInterval;
+      }
+      if (round < rounds || movingCopies.length) {
+        trailFrame = requestAnimationFrame(leaveTrails);
+      }
+    }
     const margin = parseFloat(getComputedStyle(document.body).marginRight) || 24;
     const destinationLeft = Math.max(left, document.documentElement.clientWidth - margin - poemWidth);
     const shift = destinationLeft - left;
@@ -75,18 +136,19 @@
     document.body.append(probe);
     const tabWidth = probe.getBoundingClientRect().width || 24;
     probe.remove();
-    const duration = Math.max(500, Math.abs(shift) / tabWidth * 500);
     const rounds = Math.max(...activeLines.map(item => item.characters.length));
     let round = 0;
 
     function launchRound() {
-      for (const { characters } of activeLines) {
+      for (const [lineIndex, { characters }] of activeLines.entries()) {
         const original = characters[round];
         if (!original) continue;
         const rect = original.getBoundingClientRect();
         const style = getComputedStyle(original);
         const copy = document.createElement("span");
         copy.className = "poem-copy";
+        copy.dataset.poemLine = original.parentElement.dataset.poemLine;
+        copy.dataset.poemGlyph = original.dataset.poemGlyph;
         copy.textContent = original.textContent;
         Object.assign(copy.style, {
           left: `${rect.left + window.scrollX}px`, top: `${rect.top + window.scrollY}px`,
@@ -94,20 +156,49 @@
           letterSpacing: style.letterSpacing,
         });
         layer.append(copy);
-        animations.push(copy.animate([
-          { transform: "translateX(0)" },
-          { transform: `translateX(${shift}px)` },
+        // 以短句为一组错位，再抽出部分单字，形成截图中零碎、重叠的边缘。
+        const group = Math.floor(round / 4);
+        const seed = (lineIndex + 1) * 97 + group * 13;
+        const isolated = scatter((lineIndex + 1) * 71 + round * 19) < 0.32;
+        const lineHeight = parseFloat(style.lineHeight) || 36;
+        const fontSize = parseFloat(style.fontSize) || 18;
+        const offsetX = (scatter(seed) - 0.5) * fontSize * 5;
+        const offsetY = (scatter(seed + 1) - 0.5) * lineHeight * 2.4;
+        const naturalX = rect.left + window.scrollX + shift;
+        const targetX = isolated
+          ? destinationLeft + window.scrollX + scatter(seed + round + 2) * poemWidth * 0.18
+          : naturalX + offsetX;
+        const targetY = rect.top + window.scrollY + offsetY
+          + (isolated ? (scatter(seed + round + 5) - 0.5) * lineHeight * 5 : 0);
+        // 图层覆盖全文；落点限制在页面内，末段同样完整参与。
+        const endX = Math.max(0, Math.min(
+          document.documentElement.clientWidth - margin - rect.width + window.scrollX,
+          targetX,
+        ));
+        const endY = Math.max(0, Math.min(parseFloat(layer.style.height) - rect.height, targetY));
+        const dx = endX - rect.left - window.scrollX;
+        const dy = endY - rect.top - window.scrollY;
+        const duration = Math.max(250, Math.abs(dx) / tabWidth * 250)
+          * (0.85 + scatter(seed + round + 7) * 0.3);
+        const animation = copy.animate([
+          { transform: "translate(0, 0)" },
+          // 大部分路程沿原行向右，到右侧才逐渐散开。
+          { transform: `translate(${dx * 0.72}px, ${dy * 0.12}px)`, offset: 0.72 },
+          { transform: `translate(${dx}px, ${dy}px)` },
         ], {
           duration,
           // 明显的加速：起步缓慢，随后持续加速，抵达后停留。
           easing: "cubic-bezier(0.55, 0, 1, 0.45)",
           fill: "forwards",
-        }));
+        });
+        animations.push(animation);
+        movingCopies.push({ copy, animation, nextTrail: null });
       }
       round += 1;
       if (round < rounds) timer = setTimeout(launchRound, roundInterval);
     }
     timer = setTimeout(launchRound, roundInterval);
+    trailFrame = requestAnimationFrame(leaveTrails);
   }
 
   let resizeTimer;

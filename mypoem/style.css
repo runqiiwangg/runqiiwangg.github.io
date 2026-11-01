@@ -1,6 +1,15 @@
+/* 整张背景随整页的宽、高拉伸，包含页面四周和滚动区域。 */
+html {
+  min-height: 100vh;
+  background-color: #fffef2;
+  background-image: url("background.jpg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+}
 
 body {
-  background-color: white;
+  background-color: transparent;
   color: black;
   margin: 60px;
 }
@@ -38,7 +47,7 @@ p {
 
 /* 原诗保持在文档中；移动副本单独绘制，不改变原有排版。 */
 :root {
-  --round-interval: 500ms;
+  --round-interval: 250ms;
   --tab-size: 4;
 }
 
@@ -72,3 +81,91 @@ p {
 @media (max-width: 700px) {
   body { margin: 24px; }
 }
+
+/* 阅读提示竖条：默认 42 BPM，4/4 拍，一次扫描为一小节。 */
+:root {
+  --reader-duration: 5.714285714s;
+}
+.poem-reader {
+  position: absolute;
+  top: 0;
+  left: var(--reader-start, 0px);
+  width: calc(var(--reader-travel, 0px) + var(--reader-width, 18px));
+  min-height: 100vh;
+  overflow: clip;
+  pointer-events: none;
+  z-index: 0;
+}
+.poem-reader::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--reader-width, 18px);
+  background-color: #b1dd59f9;
+  animation: poem-reader-scan var(--reader-duration) linear infinite;
+  will-change: transform;
+}
+@keyframes poem-reader-scan {
+  from { transform: translateX(0); }
+  to { transform: translateX(var(--reader-travel, 0px)); }
+}
+
+/* 底层顺序：阅读竖条 → 草地 → 原诗 → 文字副本。 */
+/* 保持 body 与 html 背景处于同一混合上下文，让嘴唇叠到底图上。 */
+.grass-field { z-index: 1; }
+body > p, body > h1 { z-index: 2; }
+.poem-copies { z-index: 3; }
+.poem-sound {
+  position: fixed;
+  top: 0;
+  left: 0;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  background: transparent;
+  mix-blend-mode: multiply;
+  isolation: auto;
+}
+/* 整个嘴唇按钮作为一个图层，与下方页面正片叠底。 */
+.poem-sound button, .poem-sound img { mix-blend-mode: normal; }
+.poem-sound button {
+  display: block;
+  position: relative;
+  width: min(392px, calc(100vw - 32px));
+  aspect-ratio: 1.294 / 1;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+/* 去色、淡暖纸色与稍强对比，保留铅笔颗粒，模拟旧扫描稿。 */
+.poem-sound img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: grayscale(1) sepia(.18) contrast(1.14) brightness(1.04);
+  pointer-events: none;
+  user-select: none;
+}
+.poem-sound .sound-playing { visibility: hidden; }
+.poem-sound button[aria-pressed="true"] .sound-playing { visibility: visible; }
+.poem-sound button[aria-pressed="true"] .sound-muted { visibility: hidden; }
+.poem-sound button:focus-visible { outline: 2px solid #323a20; outline-offset: 4px; }
+.poem-sound button:disabled { cursor: wait; }
+
+/* 水平条与垂直扫描条交叉的窗口，就是当前的读谱区域。 */
+.poem-row-reader {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 18px;
+  background-color: #b1dd59f9;
+  pointer-events: none;
+  z-index: 0;
+}
+.poem-row-reader[hidden] { display: none; }
