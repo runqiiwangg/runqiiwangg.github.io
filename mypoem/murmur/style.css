@@ -9,6 +9,21 @@ html {
   background-size: 100% 100%;
 }
 
+/* 四周黑框：左右各两个正文字宽（36px），上下各一个正文字厚（18px）。 */
+html::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  font-size: 18px;
+  border-style: solid;
+  border-color: #000;
+  border-width: 1em 2em;
+  pointer-events: none;
+  z-index: 0;
+}
+
+
 body {
   background-color: transparent;
   color: black;
@@ -180,7 +195,7 @@ body > p, body > h1 { position: relative; z-index: 3; }
 .poem-sound button {
   display: block;
   position: relative;
-  width: min(120px, calc(100vw - 32px));
+  width: min(96px, calc(100vw - 32px));
   aspect-ratio: 1.294 / 1;
   padding: 0;
   border: 0;
@@ -188,6 +203,8 @@ body > p, body > h1 { position: relative; z-index: 3; }
   background: transparent;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
   transform-origin: center;
   animation: murmur-mouth-sway 11.6s ease-in-out infinite;
 }
@@ -207,6 +224,7 @@ body > p, body > h1 { position: relative; z-index: 3; }
   width: 100%;
   height: 100%;
   object-fit: contain;
+  image-rendering: pixelated;
   filter: grayscale(1) sepia(.18) contrast(1.14) brightness(1.04);
   pointer-events: none;
   user-select: none;
@@ -249,6 +267,6 @@ body > p, body > h1 { position: relative; z-index: 3; }
 
 @media (max-width: 520px) {
   .poem-sound { gap: 6px; }
-  .poem-sound button { width: 72px; }
+  .poem-sound button { width: 64px; }
   .poem-sound-label { font-size: 14px; padding: 3px 4px; }
 }

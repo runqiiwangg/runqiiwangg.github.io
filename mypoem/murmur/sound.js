@@ -23,13 +23,16 @@
     space: .26,
   });
   const value = name => defaults[name];
+  // 横竖绿条与音乐采样共用这两个速度倍率，节拍与合成音色独立保留。
+  const readerVisualSpeed = 2;
+  const rowVisualSpeed = 2;
   const button = panel.querySelector("button");
   // 进入页面默认静音、闭嘴，点击嘴唇后才开启声音。
   let muted = true;
   let audio, master, mix, drumBus, stringBus, melodyBus, bellBus, liveGate, duck, cutoff, saturator, space, noise, wave;
   let playing = false, nextTime = 0, stepNumber = 0, barScore, previousDegree = 2;
   let barDuration = 240 / 42, stepDuration = barDuration / 16;
-  let wasInk = false, lastSampleTime = -Infinity;
+  let wasInk = false, scheduledScan = -1, lastSampleTime = -Infinity;
   let melodyDegree = 2, lastBellTime = -Infinity;
   let contactInk = false, contactBar = -1, lastHitTime = -Infinity;
   let seenCharacters = new Set(), pendingCharacters = [], nextWhisperTime = 0;
@@ -231,12 +234,16 @@
   }
 
   function readCharacters(active, feature, now, step) {
-    if (contactBar !== active.index) {
-      contactBar = active.index; contactInk = false;
+    if (contactBar !== feature.scanIndex) {
+      contactBar = feature.scanIndex; contactInk = false;
       seenCharacters = new Set(); pendingCharacters = [];
       nextWhisperTime = now; lastWhisperText = "";
     }
-    for (const character of feature.contacts || []) {
+    // 丢弃已离开实际交叉窗口的排队文字，避免扫描走远后仍在读旧字。
+    const currentContacts = feature.contacts || [];
+    const currentIds = new Set(currentContacts.map(character => character.id));
+    pendingCharacters = pendingCharacters.filter(character => currentIds.has(character.id));
+    for (const character of currentContacts) {
       if (seenCharacters.has(character.id)) continue;
       seenCharacters.add(character.id);
       pendingCharacters.push({ ...character, overlap: feature.overlap });
@@ -261,20 +268,47 @@
     }
   }
 
+  function scanPosition(progress) {
+    const position = Math.max(0, progress);
+    const scanIndex = Math.floor(position * rowVisualSpeed);
+    return {
+      scanIndex,
+      lineIndex: scanIndex % lines.length,
+      phase: (position * readerVisualSpeed) % 1,
+    };
+  }
+
   function windowFor(bar, phase) {
-    const rect = lines[bar.lineIndex].getBoundingClientRect();
-    const height = parseFloat(getComputedStyle(lines[bar.lineIndex]).fontSize) || 18;
+    // 唯一坐标来源：画面、节拍采样和实时呢喃都读取加速后的同一个窗口。
+    const position = scanPosition(bar.index + phase);
+    const line = lines[position.lineIndex];
+    const rect = line.getBoundingClientRect();
+    const height = parseFloat(getComputedStyle(line).fontSize) || 18;
     const readerRect = reader.getBoundingClientRect();
     const css = getComputedStyle(reader);
     const width = parseFloat(css.getPropertyValue("--reader-width")) || 18;
     const travel = parseFloat(css.getPropertyValue("--reader-travel")) || 0;
-    return { left: readerRect.left + Math.max(0, Math.min(1, phase)) * travel,
+    return { ...position, left: readerRect.left + position.phase * travel,
       top: rect.top + (rect.height - height) / 2, width, height };
+  }
+
+  function renderScanWindow(area, duration) {
+    reader.style.setProperty("--reader-duration", `${duration}s`);
+    if (!scanAnimation) scanAnimation = reader.getAnimations({ subtree: true })
+      .find(animation => animation.animationName === "poem-reader-scan");
+    if (scanAnimation) {
+      scanAnimation.pause();
+      scanAnimation.currentTime = area.phase * duration * 1000;
+    }
+    rowReader.hidden = false;
+    rowReader.style.top = `${area.top + window.scrollY}px`;
+    rowReader.style.height = `${area.height}px`;
   }
 
   function readWindow(bar, phase) {
     const area = windowFor(bar, phase);
-    return globalThis.poemImage.sampleRegion(area.left, area.top, area.width, area.height);
+    return { ...globalThis.poemImage.sampleRegion(area.left, area.top, area.width, area.height),
+      scanIndex: area.scanIndex };
   }
 
   function beginBar(time, barIndex) {
@@ -302,8 +336,12 @@
         duck.gain.linearRampToValueAtTime(1, nextTime + stepDuration * 1.6);
       }
       const bar = bars.at(-1);
-      // 只提前约 45ms 读即将到达的实际窗口，移动字与拖影均参加。
+      // 按即将发声的时刻计算加速后的交叉窗口，移动字与拖影均参加。
       const feature = readWindow(bar, step / 16);
+      if (scheduledScan !== feature.scanIndex) {
+        scheduledScan = feature.scanIndex;
+        wasInk = false;
+      }
       const event = globalThis.poemScore.scanEvent(feature, step, melodyDegree, wasInk);
       melodyDegree = event.lastDegree;
       wasInk = event.ink;
@@ -336,15 +374,12 @@
       lastAudioVisual = performance.now();
       visualEpoch = lastAudioVisual - (active.index * active.duration + now - active.start) * 1000;
       bars = bars.filter(bar => bar === active || bar.start > now);
-      reader.style.setProperty("--reader-duration", `${active.duration}s`);
-      if (scanAnimation) scanAnimation.currentTime = Math.max(0, now - active.start) * 1000;
-      const step = Math.min(15, Math.floor((now - active.start) / active.duration * 16));
-      const area = windowFor(active, (now - active.start) / active.duration);
-      rowReader.hidden = false;
-      rowReader.style.top = `${area.top + window.scrollY}px`;
-      rowReader.style.height = `${area.height}px`;
+      const phase = Math.max(0, now - active.start) / active.duration;
+      const step = Math.min(15, Math.floor(phase * 16));
+      const area = windowFor(active, phase);
+      renderScanWindow(area, active.duration);
       if (now - lastSampleTime >= .05) {
-        const feature = readWindow(active, (now - active.start) / active.duration);
+        const feature = readWindow(active, phase);
         active.liveFeature = feature;
         readCharacters(active, feature, now, step);
         const inkNow = feature.density > .006;
@@ -384,7 +419,7 @@
     lines = [...document.querySelectorAll(".poem-line")].filter(line => line.textContent.trim());
     if (!lines.length) throw new Error("No poem lines");
     stopSources(); bars = []; previousDegree = 2; melodyDegree = 2; lastBellTime = -Infinity; stepNumber = 0; lastSampleTime = -Infinity;
-    contactInk = false; contactBar = -1; lastHitTime = -Infinity;
+    contactInk = false; contactBar = -1; scheduledScan = -1; lastHitTime = -Infinity;
     seenCharacters = new Set(); pendingCharacters = []; nextWhisperTime = 0; lastWhisperText = "";
     liveGate.gain.cancelScheduledValues(audio.currentTime); liveGate.gain.setValueAtTime(0, audio.currentTime);
     nextTime = audio.currentTime + .1;
@@ -457,27 +492,15 @@
       if (lines.length) {
         const duration = 240 / value("tempo");
         const elapsed = Math.max(0, (timestamp - visualEpoch) / 1000);
-        const index = Math.floor(elapsed / duration) % lines.length;
-        const line = lines[index];
-        const rect = line.getBoundingClientRect();
-        const height = parseFloat(getComputedStyle(line).fontSize) || 18;
-        rowReader.style.top = `${rect.top + window.scrollY + (rect.height - height) / 2}px`;
-        rowReader.style.height = `${height}px`;
-        rowReader.hidden = false;
-        reader.style.setProperty("--reader-duration", `${duration}s`);
-        if (!scanAnimation) scanAnimation = reader.getAnimations({ subtree: true }).find(animation => animation.animationName === "poem-reader-scan");
-        if (scanAnimation) {
-          scanAnimation.pause();
-          scanAnimation.currentTime = elapsed % duration * 1000;
-        }
+        renderScanWindow(windowFor({ index: 0 }, elapsed / duration), duration);
       }
     }
-    // 保持标题处的纵向位置，整组左边缘对齐纵向绿条的固定起点。
+    // 按参考截图，将嘴唇与提示放在“呢喃”标题右侧，保持标题高度。
     const heading = document.querySelector(".poem-title");
     if (heading) {
       const titleRect = heading.getBoundingClientRect();
-      const readerRect = reader.getBoundingClientRect();
-      panel.style.left = `${readerRect.left + window.scrollX}px`;
+      const gap = window.innerWidth <= 520 ? 8 : 16;
+      panel.style.left = `${titleRect.right + window.scrollX + gap}px`;
       panel.style.top = `${titleRect.top + window.scrollY + titleRect.height / 2}px`;
     }
     requestAnimationFrame(updateScanVisuals);
