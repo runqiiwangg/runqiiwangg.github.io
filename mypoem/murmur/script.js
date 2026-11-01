@@ -50,6 +50,12 @@
   });
 
   const effects = document.querySelector(".poem-effects");
+  // 所有绿色底块集中在独立底层，避免后生成的底块盖住已有文字。
+  const backgrounds = document.createElement("div");
+  backgrounds.className = "poem-copy-backgrounds";
+  backgrounds.setAttribute("aria-hidden", "true");
+  backgrounds.setAttribute("data-music-ignore", "");
+  effects.append(backgrounds);
   const layer = document.createElement("div");
   layer.className = "poem-copies";
   layer.setAttribute("aria-hidden", "true");
@@ -75,11 +81,13 @@
     animations.forEach(animation => animation.cancel());
     animations = [];
     layer.replaceChildren();
+    backgrounds.replaceChildren();
     const activeLines = lines.filter(item => item.characters.length);
     if (!activeLines.length) return;
 
     // 绝对定位图层默认只有视口高；扩展到全文，避免末段副本被裁切。
     layer.style.height = `${Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)}px`;
+    backgrounds.style.height = layer.style.height;
     const bounds = activeLines.map(item => item.element.getBoundingClientRect());
     const left = Math.min(...bounds.map(rect => rect.left));
     const right = Math.max(...activeLines.map(item => item.characters.at(-1).getBoundingClientRect().right));
@@ -119,6 +127,11 @@
         trail.style.transform = getComputedStyle(item.copy).transform;
         trail.style.willChange = "auto";
         layer.append(trail);
+        const trailBackground = item.background.cloneNode(true);
+        trailBackground.classList.add("poem-trail-background");
+        trailBackground.style.transform = trail.style.transform;
+        trailBackground.style.willChange = "auto";
+        backgrounds.append(trailBackground);
         item.nextTrail = now + trailInterval;
       }
       if (round < rounds || movingCopies.length) {
@@ -160,6 +173,15 @@
           letterSpacing: style.letterSpacing,
         });
         layer.append(copy);
+        const background = document.createElement("span");
+        background.className = "poem-copy-background";
+        const blockHeight = (parseFloat(style.fontSize) || 18) + 4;
+        Object.assign(background.style, {
+          left: `${rect.left + window.scrollX - 1}px`,
+          top: `${rect.top + window.scrollY + (rect.height - blockHeight) / 2}px`,
+          width: `${rect.width + 2}px`, height: `${blockHeight}px`,
+        });
+        backgrounds.append(background);
         // 以短句为一组错位，再抽出部分单字，形成截图中零碎、重叠的边缘。
         const group = Math.floor(round / 4);
         const seed = (lineIndex + 1) * 97 + group * 13;
@@ -184,19 +206,26 @@
         const dy = endY - rect.top - window.scrollY;
         const duration = Math.max(250, Math.abs(dx) / tabWidth * 250)
           * (0.85 + scatter(seed + round + 7) * 0.3);
-        const animation = copy.animate([
+        const keyframes = [
           { transform: "translate(0, 0)" },
           // 大部分路程沿原行向右，到右侧才逐渐散开。
           { transform: `translate(${dx * 0.72}px, ${dy * 0.12}px)`, offset: 0.72 },
           { transform: `translate(${dx}px, ${dy}px)` },
-        ], {
+        ];
+        const timing = {
           duration,
           // 明显的加速：起步缓慢，随后持续加速，抵达后停留。
           easing: "cubic-bezier(0.55, 0, 1, 0.45)",
           fill: "forwards",
-        });
-        animations.push(animation);
-        movingCopies.push({ copy, animation, nextTrail: null });
+        };
+        const animation = copy.animate(keyframes, timing);
+        const backgroundAnimation = background.animate(keyframes, timing);
+        // 使用同一时间起点，使底块与文字在整个飞行过程中严格同步。
+        const startTime = document.timeline.currentTime;
+        animation.startTime = startTime;
+        backgroundAnimation.startTime = startTime;
+        animations.push(animation, backgroundAnimation);
+        movingCopies.push({ copy, background, animation, nextTrail: null });
       }
       round += 1;
       if (round < rounds) timer = setTimeout(launchRound, roundInterval);

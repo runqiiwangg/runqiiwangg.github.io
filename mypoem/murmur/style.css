@@ -71,13 +71,20 @@ p {
   pointer-events: none;
 }
 
-.poem-copies {
+.poem-copy-backgrounds, .poem-copies {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   pointer-events: none;
   overflow: clip;
+}
+
+.poem-copy-background {
+  position: absolute;
+  background-color: #b1dd59f9;
+  pointer-events: none;
+  will-change: transform;
 }
 
 .poem-copy {
@@ -121,11 +128,12 @@ p {
   to { transform: translateX(var(--reader-travel, 0px)); }
 }
 
-/* 底层顺序：阅读竖条 → 草地 → 原诗 → 文字副本。 */
+/* 底层顺序：阅读条 → 草地 → 绿色底块 → 原诗 → 文字副本。 */
 /* 保持 body 与 html 背景处于同一混合上下文，让嘴唇叠到底图上。 */
 .grass-field { position: absolute; pointer-events: none; z-index: 1; }
-body > p, body > h1 { position: relative; z-index: 2; }
-.poem-copies { z-index: 3; }
+.poem-copy-backgrounds { z-index: 2; }
+body > p, body > h1 { position: relative; z-index: 3; }
+.poem-copies { z-index: 4; }
 .poem-sound {
   position: absolute;
   top: 0;
@@ -167,9 +175,8 @@ body > p, body > h1 { position: relative; z-index: 2; }
   to { transform: translateY(2px) rotate(10deg); }
 }
 
-.sound-label-playing { display: none; }
-.poem-sound button[aria-pressed="true"] + .poem-sound-label .sound-label-muted { display: none; }
-.poem-sound button[aria-pressed="true"] + .poem-sound-label .sound-label-playing { display: inline; }
+/* 播放时收起整块提示，关闭声音后重新显示。 */
+.poem-sound button[aria-pressed="true"] + .poem-sound-label { display: none; }
 .poem-sound button {
   display: block;
   position: relative;
